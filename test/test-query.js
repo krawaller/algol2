@@ -108,5 +108,89 @@ describe("the matchAny function",function(){
 	});
 });
 
+describe("the resolve function",function(){
+	it("is defined",function(){expect(typeof Algol.resolve).toEqual("function");});
+	it("calls the named test func",function(){
+		var stubreturnval = "FOOBAR",
+			context = {someTestFunc: sinon.stub().returns(stubreturnval)},
+			objtotest = {foo:"bar"},
+			objtomatch = {baz:"bin"},
+			condition = {test:"someTestFunc",against:objtomatch},
+			environment = "ENV",
+			res = Algol.resolve.call(context,objtotest,condition,environment);
+		expect(res).toEqual(stubreturnval);
+		expect(context.someTestFunc).toHaveBeenCalledOnce();
+		expect(context.someTestFunc.firstCall.args).toEqual([objtotest,objtomatch,environment]);
+	});
+});
 
+describe("the ifElse function",function(){
+	it("is defined",function(){expect(typeof Algol.ifElse).toEqual("function");});
+	it("returns objects directly if they haven't got TYPE=IFELSE",function(){
+		var objtotest = {baz:"bin"},
+			nonIfElse = {foo:"bar"},
+			environment = "ENV";
+		expect(Algol.ifElse(objtotest,nonIfElse,environment)).toEqual(nonIfElse);
+	});
+	it("resolves the if and returns the ifelse-tested then if the iftest was true",function(){
+		var objtotest = {baz:"bin"},
+			ifelsereturnval = "FOOOO",
+			context = {
+				resolve: sinon.stub().returns(true),
+				ifElse: sinon.stub().returns(ifelsereturnval)
+			},
+			test = "SOMETEST",
+			then = "THENPROP",
+			ifelse = {TYPE:"IFELSE",iftest:test,then:then},
+			environment = "ENV",
+			res = Algol.ifElse.call(context,objtotest,ifelse,environment);
+		expect(res).toEqual(ifelsereturnval);
+		expect(context.resolve).toHaveBeenCalledOnce();
+		expect(context.resolve.firstCall.args).toEqual([objtotest,ifelse.iftest,environment]);
+		expect(context.ifElse).toHaveBeenCalledOnce();
+		expect(context.ifElse.firstCall.args).toEqual([objtotest,then,environment]);
+	});
+	it("resolves the if and returns the ifelse-tested otherwise if the iftest was false",function(){
+		var objtotest = {baz:"bin"},
+			ifelsereturnval = "FOOOO",
+			context = {
+				resolve: sinon.stub().returns(false),
+				ifElse: sinon.stub().returns(ifelsereturnval)
+			},
+			test = "SOMETEST",
+			otherwise = "THENPROP",
+			ifelse = {TYPE:"IFELSE",iftest:test,otherwise:otherwise},
+			environment = "ENV",
+			res = Algol.ifElse.call(context,objtotest,ifelse,environment);
+		expect(res).toEqual(ifelsereturnval);
+		expect(context.resolve).toHaveBeenCalledOnce();
+		expect(context.resolve.firstCall.args).toEqual([objtotest,ifelse.iftest,environment]);
+		expect(context.ifElse).toHaveBeenCalledOnce();
+		expect(context.ifElse.firstCall.args).toEqual([objtotest,otherwise,environment]);
+	});
+	it("passes nested integration test",function(){
+		var objtotest = {units: {player:"PLR"}},
+			returnval = "WUUUU",
+			ifelse = {
+				TYPE: "IFELSE",
+				iftest: {
+					test: "matchAll",
+					against: {units:{player:666,armour:42},board:{color:"black"}}
+				},
+				then: "NOTWANTED",
+				otherwise: {
+					TYPE: "IFELSE",
+					iftest: {
+						test: "matchAny",
+						against: {units:{player:666,armour:42},board:{color:"black"}}
+					},
+					then: returnval,
+					otherwise: "NOTWANTED"
+				}
+			},
+			environment = {PLR:666},
+			res = Algol.ifElse(objtotest,ifelse,environment);
+		expect(res).toEqual(returnval);
+	});
+});
 
