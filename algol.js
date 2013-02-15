@@ -50,7 +50,6 @@
 	 * @return {Boolean} True or false
 	 */
 	Algol.matchAny = function(position,objtomatch,environment){
-		console.log("MATCHANY",position,objtomatch,environment);
 		return _.any(objtomatch,function(aspecttomatch,aspectname){
 			return _.any(aspecttomatch,function(proptomatch,propname){
 				return this.matchProp((position[aspectname]||{})[propname],proptomatch,environment);
