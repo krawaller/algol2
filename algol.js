@@ -34,16 +34,11 @@
 	 * @return {Boolean} True or false
 	 */
 	Algol.matchAll = function(position,objtomatch,environment){
-		for(var aspectname in objtomatch){
-			var aspect = position[aspectname],
-				aspecttomatch = objtomatch[aspectname] || {};
-			for(var propname in aspecttomatch){
-				if (!this.matchProp(aspect[propname],aspecttomatch[propname],environment)){
-					return false;
-				}
-			}
-		}
-		return true;
+		return _.all(objtomatch,function(aspecttomatch,aspectname){
+			return _.all(aspecttomatch,function(proptomatch,propname){
+				return this.matchProp((position[aspectname]||{})[propname],proptomatch,environment);
+			},this);
+		},this);
 	};
 
 	/**
@@ -55,16 +50,11 @@
 	 * @return {Boolean} True or false
 	 */
 	Algol.matchAny = function(position,objtomatch,environment){
-		for(var aspectname in objtomatch){
-			var aspect = position[aspectname],
-				aspecttomatch = objtomatch[aspectname] || {};
-			for(var propname in aspecttomatch){
-				if (this.matchProp(aspect[propname],aspecttomatch[propname],environment)){
-					return true;
-				}
-			}
-		}
-		return false;
+		return _.any(objtomatch,function(aspecttomatch,aspectname){
+			return _.any(aspecttomatch,function(proptomatch,propname){
+				return this.matchProp((position[aspectname]||{})[propname],proptomatch,environment);
+			},this);
+		},this);
 	};
 
 

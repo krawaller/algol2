@@ -56,13 +56,13 @@ describe("the matchAll function",function(){
 	it("uses matchProp and passes if that returns true",function(){
 		var context = {matchProp: sinon.stub().returns(true)},
 			environment = "ENV",
-			object = {foo:{bar:"bin"}},
-			objecttomatch = {foo:{bar:"bar",BAR:"BOO"}},
+			object = {foo:{bar:"bin5"}},
+			objecttomatch = {foo:{bar:"bar2000",BAR:"BOO2000"}},
 			res = Algol.matchAll.call(context,object,objecttomatch,environment);
 		expect(res).toEqual(true);
 		expect(context.matchProp).toHaveBeenCalledTwice();
-		expect(context.matchProp.firstCall.args).toEqual(["bin","bar",environment]);
-		expect(context.matchProp.secondCall.args).toEqual([undefined,"BOO",environment]);
+		expect(context.matchProp.firstCall.args).toEqual(["bin5","bar2000",environment]);
+		expect(context.matchProp.secondCall.args).toEqual([undefined,"BOO2000",environment]);
 	});
 	it("passes integrity test too",function(){
 		var environment = "ENV",
