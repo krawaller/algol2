@@ -1,7 +1,5 @@
 describe("the position function",function(){
-	it("is defined",function(){
-		expect(typeof Algol.getWorldPosition).toEqual("function");
-	});
+	it("is defined",function(){ expect(typeof Algol.getWorldPosition).toEqual("function"); });
 	it("returns ok object",function(){
 		var world = {
 			foo: {
