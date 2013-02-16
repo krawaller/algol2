@@ -10,7 +10,7 @@
 	 * @param {Number} ykx A ykx-styled address
 	 * @return {Object} A place object
 	 */
-	Algol.getWorldPosition = function(world,ykx){
+	Algol.getWorldPlace = function(world,ykx){
 		return _.reduce(world,function(pos,aspect,aspectname){
 			return _.extend(pos,_.object([aspectname],[aspect[ykx] || {}]));
 		},{TYPE:"POSITION"});
@@ -18,6 +18,7 @@
 
 	/**
 	 * Tests a single propvalue towards wanted value and environment.
+	 * If proptomatch is a NOT test, it will call itself and return inverted result.
 	 * Used in matchAll, matchAny
 	 * @param {Value} prop The value we want to test
 	 * @param {Value} proptomatch The value we want. Can also be an environment property name
@@ -25,7 +26,7 @@
 	 * @return {Boolean} True or false
 	 */
 	Algol.matchProp = function(prop,proptomatch,environment){
-		return prop === proptomatch || proptomatch === environment[prop];
+		return proptomatch.TYPE === "NOT" ? !this.matchProp(prop,proptomatch.value,environment) : prop === proptomatch || environment[prop] === proptomatch;
 	};
 
 	/**
@@ -82,19 +83,33 @@
 	};
 
 
+	/**
+	 * Finds all places in the world that matches
+	 * @param {Object} world A collection of aspects
+	 * @param {Object} placetomatch A place object to match against
+	 * @param {Object} environment An object with environment variables
+	 * @param {Array} addresses An array of potential addresses
+	 * @returns {Array} An array of matching addresses
+	 */
+	Algol.findMatchingPlaceAddresses = function(world,placetomatch,environment,addresses){
+		return _.filter(addresses,function(addr){
+			return this.matchAll(this.getWorldPlace(world,addr),placetomatch,environment);
+		},this);
+	};
+
+
 /*€€€€€€€€€€€€€€€€€€€€€€€€€€€ B O A R D  F U N C T I O N S €€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€*/
 
 	/**
 	 * Finds a new position on the board
 	 * @param {Object} pos A position object with x and y props
 	 * @param {Number} dir The direction in which to walk
-	 * @param {Number} forward How many steps to take forward
-	 * @param {Number} right How many steps to take right
+	 * @param {Object} instruction Object with forward and right prop
 	 * @param {Object} board The board definition
 	 * @returns {Object} A new position object
 	 */
-	Algol.moveInDir = function(pos,dir,forward,right,board){
-		var x = pos.x, y = pos.y;
+	Algol.moveInDir = function(pos,dir,instruction,board){
+		var x = pos.x, y = pos.y, forward = instruction.forward, right = instruction.right;
 		switch((board || {}).shape){
 			default:
 				switch(dir){
@@ -135,5 +150,65 @@
 			default: return pos.x > 0 && pos.x <= board.x && pos.y>0 && pos.y <= board.y;
 		}
 	};
+
+	/**
+	 * Converts coordinates into a ykx number
+	 * @params {Object} pos Coordinates to convert
+	 * @returns {Number} A ykx number of the coordinates
+	 */
+	Algol.posToYkx = function(pos){ return pos.y*1000+pos.x; };
+
+	/**
+	 * Converts ykx number into coordinates
+	 * @params {Number} ykx A ykx number to convert
+	 * @returns {Object} A position object with x and y props
+	 */
+	Algol.ykxToPos = function(ykx){ return {y:Math.floor(ykx/1000),x:ykx%1000}; };
+
+
+	/**
+	 * Takes a board definition and returns obj for each pos, with colours and coords
+	 * @params {Object} board A board definition
+	 * @returns {Object} An aspect object
+	 */
+	Algol.generateBoardSquares = function(board){
+		var ret = {};
+		_.each(_.range(1,board.y+1),function(y){
+			_.each(_.range(1,board.x+1),function(x){
+				ret[this.posToYkx({x:x,y:y})] = { y: y, x: x, colour: ["white","black"][(x+(y%2))%2] };
+			},this);
+		},this);
+		return ret;
+	};
+
+/*€€€€€€€€€€€€€€€€€€€€€€€€€€€ G E N E R A T O R   F U N C T I O N S €€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€*/
+
+	/**
+	 * Tries to offset from pos into all given dirs. Won't include outofbounds results.
+	 * @param {Object} def An object defining the offset. Here we use the forward and right props.
+	 * @param {Object} startpos A location object with x and y coords of starting position.
+	 * @param {Array} dirs An array of direction numbers to offset in.
+	 * @param {Object} board The board definition, used to check out of bounds for generated squares..
+	 * @returns {Object} ykx object of all generated positions, each containing dir.
+	 */
+	Algol.offsetInDirs = function(def,startpos,dirs,board){
+		return _.reduce(dirs,function(ret,dir){
+			var newpos = this.moveInDir(startpos,dir,def,board);
+			return this.isOnBoard(newpos,board) ? _.extend(ret,_.object([this.posToYkx(newpos)],[{dir:dir}])) : ret;
+		},{},this);
+	};
+
+	/**
+	 *
+	 *
+	 */
+	Algol.walkCheck = function(pos,distance,max,stops,steps,board){
+		if (max && distance > max) return "exceededmax";
+		if (this.isOnBoard(pos,board)) return "outofbounds";
+		var ykx = this.posToYkx(pos);
+		if (steps && steps[ykx]) return "nostep";
+		if (stops && stops[ykx]) return "hitstop";
+	};
+
 
 })(window);

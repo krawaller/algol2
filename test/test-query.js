@@ -1,5 +1,5 @@
-describe("the position function",function(){
-	it("is defined",function(){ expect(typeof Algol.getWorldPosition).toEqual("function"); });
+describe("the getWorldPlace function",function(){
+	it("is defined",function(){ expect(typeof Algol.getWorldPlace).toEqual("function"); });
 	it("returns ok object",function(){
 		var world = {
 			foo: {
@@ -14,7 +14,7 @@ describe("the position function",function(){
 				4321: {someblah:"roo"}
 			}
 		};
-		var res = Algol.getWorldPosition(world,2003);
+		var res = Algol.getWorldPlace(world,2003);
 		//expect({a:1}).toEqual({a:1});
 		expect(res).toEqual({TYPE:"POSITION",foo:{prop:"good"},bar:{myprop:"good",importantmsg:"buymilk"},baz:{}});
 	});
@@ -33,6 +33,29 @@ describe("the matchProp function",function(){
 	it("returns true when equals environment var",function(){
 		var res = Algol.matchProp("PLAYER",1,{PLAYER:1});
 		expect(res).toEqual(true);
+	});
+	describe("when given NOT test",function(){
+		it("returns true if test fails, calling itself to find out",function(){
+			var context = { matchProp: sinon.stub().returns(false) },
+				environment = "ENV",
+				prop = "PROP",
+				proptonotmatch = "SOMEVAL",
+				test = {TYPE:"NOT",value:proptonotmatch},
+				res = Algol.matchProp.call(context,prop,test,environment);
+			expect(res).toEqual(true);
+			expect(context.matchProp).toHaveBeenCalledOnce();
+			expect(context.matchProp.firstCall.args).toEqual([prop,proptonotmatch,environment]);
+		});
+		it("returns false if test passes",function(){
+			var context = { matchProp: sinon.stub().returns(true) },
+				environment = "ENV",
+				prop = "PROP",
+				proptonotmatch = "SOMEVAL",
+				test = {TYPE:"NOT",value:proptonotmatch},
+				res = Algol.matchProp.call(context,prop,test,environment);
+			expect(res).toEqual(false);
+
+		});
 	});
 });
 
@@ -189,6 +212,38 @@ describe("the ifElse function",function(){
 			environment = {PLR:666},
 			res = Algol.ifElse(objtotest,ifelse,environment);
 		expect(res).toEqual(returnval);
+	});
+});
+
+describe("the findMatchingPlaceAddresses function",function(){
+	it("is defined",function(){ expect(typeof Algol.findMatchingPlaceAddresses).toEqual("function"); });
+	it("works as expected",function(){
+		var world = "world",
+			placetomatch = "placetomatch",
+			environment = "ENV",
+			addresses = [2,3],
+			worldplace = "worldplace",
+			context = {
+				getWorldPlace: sinon.stub().returns(worldplace),
+				matchAll: sinon.stub().returns(false)
+			},
+			ret = Algol.findMatchingPlaceAddresses.call(context,world,placetomatch,environment,addresses);
+		expect(ret).toEqual([]);
+		expect(context.getWorldPlace).toHaveBeenCalledTwice();
+		expect(context.getWorldPlace.firstCall.args).toEqual([world,2]);
+		expect(context.getWorldPlace.secondCall.args).toEqual([world,3]);
+		expect(context.matchAll).toHaveBeenCalledTwice();
+		expect(context.matchAll.firstCall.args).toEqual([worldplace,placetomatch,environment]);
+	});
+	it("returns correct addresses in an integration test",function(){
+		var world = {
+				foo:{1:{prop:1},2:{prop:1},3:{prop:1}},
+				bar:{1:{some:"what"},2:{some:"what"}}
+			},
+			placetomatch = {foo:{prop:1},bar:{some:"what"}},
+			environment = "ENV",
+			addresses = [2,3];
+		expect(Algol.findMatchingPlaceAddresses(world,placetomatch,environment,addresses)).toEqual([2]);
 	});
 });
 
