@@ -27,18 +27,18 @@ describe("the dirRelativeTo",function(){
 	});
 });
 
-describe("the isOnBoard",function(){
-	it("is defined",function(){ expect(typeof Algol.isOnBoard).toEqual("function"); });
+describe("the outOfBounds",function(){
+	it("is defined",function(){ expect(typeof Algol.outOfBounds).toEqual("function"); });
 	describe("when testing on a rectangle board",function(){
 		var board = {x:5,y:5,shape:"rectangle"};
 		it("warns when outside",function(){
 			[{x:0,y:1},{y:0,x:1},{x:666,y:1},{x:1,y:666}].forEach(function(outside){
-				expect(Algol.isOnBoard(outside,board)).toEqual(false);
+				expect(Algol.outOfBounds(outside,board)).toEqual(false);
 			});
 		});
 		it("returns true when not outside",function(){
 			[{x:1,y:5},{y:5,x:1},{x:1,y:1},{x:5,y:5},{x:3,y:3}].forEach(function(outside){
-				expect(Algol.isOnBoard(outside,board)).toEqual(true);
+				expect(Algol.outOfBounds(outside,board)).toEqual(true);
 			});
 		});
 	});
