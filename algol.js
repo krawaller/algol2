@@ -12,6 +12,18 @@ _.merge = function(collection,maker,memo,context){
 
 _.toArray = function(o){ return o != undefined ? _.isArray(o) ? o : [o] : []; };
 
+_.series = function(arr){
+	var i = 0;
+	return function(){ return arr[i++];};
+};
+
+_.mapObj = function(obj,iterator,context){
+	_.each(obj,function(val,key){
+		obj[key] = iterator.call(context,val,key,obj);
+	},this);
+	return obj;
+};
+
 /*€€€€€€€€€€€€€€€€€€€€€€€€€€€ Q U E R Y   F U N C T I O N S €€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€*/
 
 	/**
@@ -316,8 +328,9 @@ _.toArray = function(o){ return o != undefined ? _.isArray(o) ? o : [o] : []; };
 	 * @return {Object} Stepstate object
 	 */
 	Algol.calcObj = function(starts,changes,step,fname){
-		return !changes ? starts : _.reduce(_.union(_.keys(starts),_.keys(changes)),function(memo,key){
-			return _.extend(_.object([key],[this[fname||"calcPropVal"](starts[key],changes[key],step)]),memo);
+		return !changes ? starts : _.reduce(_.union(_.keys(starts||{}),_.keys(changes)),function(memo,key){
+			console.log(key,starts,changes,step,fname);
+			return _.extend(_.object([key],[this[fname||"calcPropVal"]((starts||{})[key],changes[key],step)]),memo);
 		},{},this);
 	};
 
@@ -325,5 +338,15 @@ _.toArray = function(o){ return o != undefined ? _.isArray(o) ? o : [o] : []; };
 	 *
 	 */
 	Algol.calcColl = function(starts,changes,step){ return this.calcObj(starts,changes,step,"calcObj");};
+
+	/**
+	 *
+	 */
+	Algol.calcChangingAspect = function(starts,changes,moulds,step){
+		return _.mapObj(this.calcObj(starts,changes,step,"calcObj"),function(unit,unitname){
+			console.log("UNIT",unit,unitname);
+			return unit.type && moulds[unit.type] ? _.extend(unit,moulds[unit.type]) : unit;
+		},this);
+	};
 
 })(window);
