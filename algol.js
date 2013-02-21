@@ -1,6 +1,16 @@
 ;(function(global){
 	var Algol = global.Algol = {};
 
+/*€€€€€€€€€€€€€€€€€€€€ U N D E R S C O R E   E X T E N S I O N S €€€€€€€€€€€€€€€€€€€€€€€€€€€€*/
+
+_.merge = function(collection,maker,memo,context){
+	if (context) { maker = _.bind(maker,context); }
+	return _.reduce(collection,function(memo,item,key){
+		return _.extend(memo,maker(item,key,collection) || {});
+	},memo,context);
+};
+
+_.toArray = function(o){ return o != undefined ? _.isArray(o) ? o : [o] : []; };
 
 /*€€€€€€€€€€€€€€€€€€€€€€€€€€€ Q U E R Y   F U N C T I O N S €€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€*/
 
@@ -10,15 +20,20 @@
 	 * @param {Number} ykx A ykx-styled address
 	 * @return {Object} A place object
 	 */
-	Algol.getWorldPlace = function(world,ykx){
+	Algol.getWorldPlaceByYkx = function(world,ykx){
+		/*return _.merge(world,function(aspect,aspectname){
+			return _.object([aspectname],[aspect[ykx] || {}]);
+		},_.extend({TYPE:"PLACE"},this.ykxToPos(ykx)));*/
 		return _.reduce(world,function(pos,aspect,aspectname){
 			return _.extend(pos,_.object([aspectname],[aspect[ykx] || {}]));
-		},{TYPE:"POSITION"});
+		},_.extend({TYPE:"PLACE"},this.ykxToPos(ykx)));
 	};
 
 	/**
-	 * Tests a single propvalue towards wanted value and environment.
+	 * Tests a single propvalue towards wanted value.
 	 * If proptomatch is a NOT test, it will call itself and return inverted result.
+	 * If proptomatch is an OR test, will return true if any of those are true.
+	 * If proptomatch is an ENV test, it will call itself on corresponding environment variable.
 	 * Used in matchAll, matchAny
 	 * @param {Value} prop The value we want to test
 	 * @param {Value} proptomatch The value we want. Can also be an environment property name
@@ -26,8 +41,26 @@
 	 * @return {Boolean} True or false
 	 */
 	Algol.matchProp = function(prop,proptomatch,environment){
-		return proptomatch.TYPE === "NOT" ? !this.matchProp(prop,proptomatch.value,environment) : prop === proptomatch || environment[prop] === proptomatch;
+		switch((proptomatch || {}).TYPE){
+			case "NOT": return !this.matchProp(prop,proptomatch.value,environment);
+			case "OR": return _.any(proptomatch.values,function(propval){return this.matchProp(prop,propval,environment);},this);
+			case "ENV": return this.matchProp(prop,environment[proptomatch.value],environment);
+			default: return prop === proptomatch;
+		}
 	};
+
+	/*
+	 * @param {Object or Array} aspect
+	 *
+	 */
+	Algol.matchAllPropsInAspect = function(placeaspectarr,aspecttomatch,environment){
+		return _.any(_.toArray(placeaspectarr),function(placeaspect){
+			return _.all(aspecttomatch,function(proptomatch,propname){
+				return this.matchProp(placeaspect[propname],proptomatch,environment);
+			},this);
+		},this);
+	};
+
 
 	/**
 	 * Tests if a place object fully matches an object of props.
@@ -39,15 +72,19 @@
 	 */
 	Algol.matchAll = function(place,objtomatch,environment){
 		return _.all(objtomatch,function(aspecttomatch,aspectname){
-			return _.all(aspecttomatch,function(proptomatch,propname){
-				return this.matchProp((place[aspectname]||{})[propname],proptomatch,environment);
-			},this);
+			return this.matchAllPropsInAspect(place[aspectname],aspecttomatch,environment);
 		},this);
+			/*return _.any(_.toArray(place[aspectname]),function(placeaspect){
+				return _.all(aspecttomatch,function(proptomatch,propname){
+					return this.matchProp(placeaspect[propname],proptomatch,environment);
+				},this);
+			},this);*/
+		//},this);
 	};
 
 	/**
 	 * Tests if a place object matches an object of props.
-	 * Passes if ANY prop matches.
+	 * Passes if ANY propmatch is successfull.
 	 * @param {Object} place A place object, containing aspect names with prop objects
 	 * @param {Object} objtomatch An object with aspect names and props to match
 	 * @param {Object} environment An object with environment variables.
@@ -93,7 +130,7 @@
 	 */
 	Algol.findMatchingPlaceAddresses = function(world,placetomatch,environment,addresses){
 		return _.filter(addresses,function(addr){
-			return this.matchAll(this.getWorldPlace(world,addr),placetomatch,environment);
+			return this.matchAll(this.getWorldPlaceByYkx(world,addr),placetomatch,environment);
 		},this);
 	};
 
@@ -172,13 +209,12 @@
 	 * @returns {Object} An aspect object
 	 */
 	Algol.generateBoardSquares = function(board){
-		var ret = {};
-		_.each(_.range(1,board.y+1),function(y){
-			_.each(_.range(1,board.x+1),function(x){
-				ret[this.posToYkx({x:x,y:y})] = { y: y, x: x, colour: ["white","black"][(x+(y%2))%2] };
-			},this);
-		},this);
-		return ret;
+		switch((board || {}).shape){
+			default: return _.reduce(_.range(1,board.x*board.y+1),function(ret,num){
+				var y = Math.floor((num-1)/board.x)+1, x = num-((y-1)*board.x);
+				return _.extend(ret,_.object([this.posToYkx({x:x,y:y})],[{ y: y, x: x, colour: ["white","black"][(x+(y%2))%2] }]));
+			},{},this);
+		}
 	};
 
 /*€€€€€€€€€€€€€€€€€€€€€€€€€€€ G E N E R A T O R   F U N C T I O N S €€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€*/
@@ -217,13 +253,14 @@
 	};
 
 	/**
-	 * Walks in the given dir, creating step/stop squares accordingly
+	 * Walks in the given dir, creating step/stop squares accordingly. Used in walkInDirs
 	 * @param {Object} def The walk definition
 	 * @param {Object} startpos The x-y position to start from
 	 * @param {Number} dir The direction to walk in
 	 * @param {Object} stops A ykx object of stops, if any
 	 * @param {Object} steps A ykx object of steps, if any
 	 * @param {Object} board The board definition
+	 * @returns {Object}
 	 */
 	Algol.walkInDir = function(def,startpos,dir,stops,steps,board){
 		var pos = startpos, instr = {forward:1}, stopstate, distance = 0, sqrs = [];
@@ -236,5 +273,57 @@
 		},{},this);
 	};
 
+	/**
+	 * Executes walkInDir for all given directions
+	 * @param {Object} def The walk definition
+	 * @param {Object} startpos The x-y position to start from
+	 * @param {Array} dirs All directions to walk in
+	 * @param {Object} stops A ykx object of stops, if any
+	 * @param {Object} steps A ykx object of steps, if any
+	 * @param {Object} board The board definition
+	 * @returns {Object}
+	 */
+	Algol.walkInDirs = function(def,startpos,dirs,stops,steps,board){
+		return _.reduce(dirs,function(ret,dir){
+			return _.extend(ret,this.walkInDir(def,startpos,dir,stops,steps,board));
+		},{},this);
+	};
+
+
+/*€€€€€€€€€€€€€€€€€€€€€€€€€€€ T I M E   F U N C T I O N S €€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€*/
+
+	/**
+	 * Calculates property state at a given time according to startvalue and changes
+	 * @param {Number|String} startvalue
+	 * @param {Array} changes List of changes, each change is [step,value]
+	 * @param {Number} step
+	 * @return {Number|String} Value at given time
+	 */
+	Algol.calcPropVal = function(startvalue,changes,step){
+		if (!changes){ return startvalue; } // no change, return startval
+		if ((!step) || step > changes[changes.length-1][0]){ return changes[changes.length-1][1]; } // no time given or time after last change, return last change value
+		if (step < changes[0][0]){ return startvalue; } // time prior to first change, return start val
+		return _.find(changes.slice().reverse(),function(change){ return change[0] <= step; })[1]; // last change val before step
+	};
+
+	/**
+	 * Calculates startvalues and changes for a single object into a given time state
+	 * Used only by calcCollection
+	 * @param {Object} startproperties Starting object
+	 * @param {Object} changes Per property changes
+	 * @param {Number} step Which step to calculate to
+	 * @param {String} fname internal shit
+	 * @return {Object} Stepstate object
+	 */
+	Algol.calcObj = function(starts,changes,step,fname){
+		return !changes ? starts : _.reduce(_.union(_.keys(starts),_.keys(changes)),function(memo,key){
+			return _.extend(_.object([key],[this[fname||"calcPropVal"](starts[key],changes[key],step)]),memo);
+		},{},this);
+	};
+
+	/**
+	 *
+	 */
+	Algol.calcColl = function(starts,changes,step){ return this.calcObj(starts,changes,step,"calcObj");};
 
 })(window);

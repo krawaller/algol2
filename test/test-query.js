@@ -1,22 +1,34 @@
-describe("the getWorldPlace function",function(){
-	it("is defined",function(){ expect(typeof Algol.getWorldPlace).toEqual("function"); });
-	it("returns ok object",function(){
+describe("the getWorldPlaceByYkx function",function(){
+	it("is defined",function(){ expect(typeof Algol.getWorldPlaceByYkx).toEqual("function"); });
+	describe("when called",function(){
 		var world = {
-			foo: {
-				2003: {prop:"good"},
-				1006: {otherprop:"someval"}
-			},
-			bar: {
-				2003: {myprop:"good",importantmsg:"buymilk"},
-				3456: {myotherprop:"someval"}
-			},
-			baz: {
-				4321: {someblah:"roo"}
-			}
-		};
-		var res = Algol.getWorldPlace(world,2003);
-		//expect({a:1}).toEqual({a:1});
-		expect(res).toEqual({TYPE:"POSITION",foo:{prop:"good"},bar:{myprop:"good",importantmsg:"buymilk"},baz:{}});
+				foo: {
+					2003: {prop:"good"},
+					1006: {otherprop:"someval"}
+				},
+				bar: {
+					2003: {myprop:"good",importantmsg:"buymilk"},
+					3456: {myotherprop:"someval"}
+				},
+				baz: {
+					4321: {someblah:"roo"}
+				}
+			}, pos = {x:_.uniqueId()},
+			context = { ykxToPos: sinon.stub().returns(pos) },
+			res = Algol.getWorldPlaceByYkx.call(context,world,2003);
+		it("returns correct object",function(){
+			expect(res).toEqual({
+				TYPE:"PLACE",
+				x: pos.x,
+				foo:{prop:"good"},
+				bar:{myprop:"good",importantmsg:"buymilk"},
+				baz:{}
+			});
+		});
+		it("used ykxToPos",function(){
+			expect(context.ykxToPos).toHaveBeenCalledOnce();
+			expect(context.ykxToPos.firstCall.args).toEqual([2003]);
+		});
 	});
 });
 
@@ -30,9 +42,23 @@ describe("the matchProp function",function(){
 		var res = Algol.matchProp("foo","foo",{});
 		expect(res).toEqual(true);
 	});
-	it("returns true when equals environment var",function(){
-		var res = Algol.matchProp("PLAYER",1,{PLAYER:1});
-		expect(res).toEqual(true);
+	it("returns false when proptomatch is missing",function(){
+		expect(Algol.matchProp("foo")).toEqual(false);
+	});
+	describe("environment tests",function(){
+		var returnval = _.uniqueId(),
+			context = { matchProp: sinon.stub().returns(returnval) },
+			proptomatch = {
+				TYPE:"ENV",value:_.uniqueId()
+			},
+			environment = {foo:_.uniqueId()},
+			prop = "foo",
+			res = Algol.matchProp.call(context,prop,proptomatch,environment);
+		it("should return value from envtest value",function(){
+			expect(context.matchProp).toHaveBeenCalledOnce();
+			expect(context.matchProp.firstCall.args).toEqual([prop,environment.value,environment]);
+			expect(res).toEqual(returnval);
+		});
 	});
 	describe("when given NOT test",function(){
 		it("returns true if test fails, calling itself to find out",function(){
@@ -57,6 +83,42 @@ describe("the matchProp function",function(){
 
 		});
 	});
+	describe("when given OR test",function(){
+		describe("with no matching values",function(){
+			var context = { matchProp: sinon.stub().returns(false) },
+				environment = _.uniqueId(),
+				prop = _.uniqueId(),
+				vals = [_.uniqueId(),_.uniqueId(),_.uniqueId()],
+				test = {TYPE:"OR",values:vals},
+				res = Algol.matchProp.call(context,prop,test,environment);
+			it("returns false",function(){
+				expect(res).toEqual(false);
+			});
+			it("called itself on all three vals",function(){
+				expect(context.matchProp).toHaveBeenCalledThrice();
+				expect(context.matchProp.firstCall.args).toEqual([prop,vals[0],environment]);
+				expect(context.matchProp.secondCall.args).toEqual([prop,vals[1],environment]);
+				expect(context.matchProp.thirdCall.args).toEqual([prop,vals[2],environment]);
+			});
+		});
+		describe("with a matching val",function(){
+			var tried = 0,
+				context = { matchProp: sinon.spy(function(){return ++tried===2;}) },
+				environment = _.uniqueId(),
+				prop = _.uniqueId(),
+				vals = [_.uniqueId(),_.uniqueId(),_.uniqueId()],
+				test = {TYPE:"OR",values:vals},
+				res = Algol.matchProp.call(context,prop,test,environment);
+			it("returns true",function(){
+				expect(res).toEqual(true);
+			});
+			it("called itself on vals until it found match",function(){
+				expect(context.matchProp).toHaveBeenCalledTwice();
+				expect(context.matchProp.firstCall.args).toEqual([prop,vals[0],environment]);
+				expect(context.matchProp.secondCall.args).toEqual([prop,vals[1],environment]);
+			});
+		});
+	});
 });
 
 describe("the matchAll function",function(){
@@ -65,33 +127,38 @@ describe("the matchAll function",function(){
 		var res = Algol.matchAll({foo:"bar"},{},{});
 		expect(res).toEqual(true);
 	});
-	it("uses matchProp and fails if that returns false",function(){
-		var context = {matchProp: sinon.stub().returns(false)},
+	it("uses matchAllPropsInAspect and returns that result",function(){
+		var context = {matchAllPropsInAspect: sinon.stub().returns(true)},
 			environment = "ENV",
 			object = {foo:{bar:"bin"}},
 			objecttomatch = {foo:{bar:"bar"}},
 			res = Algol.matchAll.call(context,object,objecttomatch,environment);
-		expect(res).toEqual(false);
-		expect(context.matchProp).toHaveBeenCalledWith("bin","bar",environment);
-	});
-	it("uses matchProp and passes if that returns true",function(){
-		var context = {matchProp: sinon.stub().returns(true)},
-			environment = "ENV",
-			object = {foo:{bar:"bin5"}},
-			objecttomatch = {foo:{bar:"bar2000",BAR:"BOO2000"}},
-			res = Algol.matchAll.call(context,object,objecttomatch,environment);
 		expect(res).toEqual(true);
-		expect(context.matchProp).toHaveBeenCalledTwice();
-		expect(context.matchProp.firstCall.args).toEqual(["bin5","bar2000",environment]);
-		expect(context.matchProp.secondCall.args).toEqual([undefined,"BOO2000",environment]);
+		expect(context.matchAllPropsInAspect).toHaveBeenCalledWith(object.foo,objecttomatch.foo,environment);
 	});
-	it("passes integrity test too",function(){
+	it("passes integration test too",function(){
 		var environment = "ENV",
 			object = {foo:{bar:"bin",BAR:"BOO",yada:"whatever"}},
 			objecttomatch = {foo:{bar:"bin",BAR:"BOO"}},
 			res = Algol.matchAll(object,objecttomatch,environment);
 		expect(res).toEqual(true);
 	});
+	/*describe("when aspects are arrays",function(){
+		it("handles passing test",function(){
+			var environment = "ENV",
+				object = {foo:[{bar:"bin1"},{bar:"bin2"}],woo:{wee:"wuu"}},
+				objecttomatch = {foo:{bar:"bin2"},woo:{wee:"wuu"}},
+				res = Algol.matchAll(object,objecttomatch,environment);
+			expect(res).toEqual(true);
+		});
+		it("handles failing test",function(){
+			var environment = "ENV",
+				object = {foo:[{bar:"bin1"},{bar:"bin2"}],woo:{wee:"wuu"}},
+				objecttomatch = {foo:{bar:"bin3"},woo:{wee:"wuu"}},
+				res = Algol.matchAll(object,objecttomatch,environment);
+			expect(res).toEqual(false);
+		});
+	});*/
 });
 
 
@@ -190,20 +257,20 @@ describe("the ifElse function",function(){
 		expect(context.ifElse.firstCall.args).toEqual([objtotest,otherwise,environment]);
 	});
 	it("passes nested integration test",function(){
-		var objtotest = {units: {player:"PLR"}},
+		var objtotest = {units: {player:666}},
 			returnval = "WUUUU",
 			ifelse = {
 				TYPE: "IFELSE",
 				iftest: {
 					test: "matchAll",
-					against: {units:{player:666,armour:42},board:{color:"black"}}
+					against: {units:{player:{TYPE:"ENV",value:"PLR"},armour:42},board:{color:"black"}}
 				},
 				then: "NOTWANTED",
 				otherwise: {
 					TYPE: "IFELSE",
 					iftest: {
 						test: "matchAny",
-						against: {units:{player:666,armour:42},board:{color:"black"}}
+						against: {units:{player:{TYPE:"ENV",value:"PLR"},armour:42},board:{color:"black"}}
 					},
 					then: returnval,
 					otherwise: "NOTWANTED"
@@ -220,18 +287,18 @@ describe("the findMatchingPlaceAddresses function",function(){
 	it("works as expected",function(){
 		var world = "world",
 			placetomatch = "placetomatch",
-			environment = "ENV",
+			environment = _.uniqueId(),
 			addresses = [2,3],
 			worldplace = "worldplace",
 			context = {
-				getWorldPlace: sinon.stub().returns(worldplace),
+				getWorldPlaceByYkx: sinon.stub().returns(worldplace),
 				matchAll: sinon.stub().returns(false)
 			},
 			ret = Algol.findMatchingPlaceAddresses.call(context,world,placetomatch,environment,addresses);
 		expect(ret).toEqual([]);
-		expect(context.getWorldPlace).toHaveBeenCalledTwice();
-		expect(context.getWorldPlace.firstCall.args).toEqual([world,2]);
-		expect(context.getWorldPlace.secondCall.args).toEqual([world,3]);
+		expect(context.getWorldPlaceByYkx).toHaveBeenCalledTwice();
+		expect(context.getWorldPlaceByYkx.firstCall.args).toEqual([world,2]);
+		expect(context.getWorldPlaceByYkx.secondCall.args).toEqual([world,3]);
 		expect(context.matchAll).toHaveBeenCalledTwice();
 		expect(context.matchAll.firstCall.args).toEqual([worldplace,placetomatch,environment]);
 	});
@@ -241,7 +308,7 @@ describe("the findMatchingPlaceAddresses function",function(){
 				bar:{1:{some:"what"},2:{some:"what"}}
 			},
 			placetomatch = {foo:{prop:1},bar:{some:"what"}},
-			environment = "ENV",
+			environment = _.uniqueId(),
 			addresses = [2,3];
 		expect(Algol.findMatchingPlaceAddresses(world,placetomatch,environment,addresses)).toEqual([2]);
 	});

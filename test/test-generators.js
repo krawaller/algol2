@@ -258,12 +258,32 @@ describe("the walkInDir function",function(){
 	});
 });
 
-
-
-
-
-
-
+describe("the walkInDirs function",function(){
+	it("is defined",function(){ expect(typeof Algol.walkInDir).toEqual("function"); });
+	describe("when used",function(){
+		var context = { walkInDir: sinon.spy(function(foo,bar,dir){
+				return _.object(["x"+dir,"y"+dir],[dir,dir]);
+			})},
+			dirs = [1,2,3],
+			def = _.uniqueId(),
+			startpos = _.uniqueId(),
+			stops = _.uniqueId(),
+			steps = _.uniqueId(),
+			board = _.uniqueId(),
+			res = Algol.walkInDirs.call(context,def,startpos,dirs,stops,steps,board);
+		it("returns correct object",function(){
+			expect(res).toEqual({
+				x1: 1, x2: 2, x3: 3, y1: 1, y2: 2, y3: 3
+			});
+		});
+		it("used walkInDir correctly",function(){
+			expect(context.walkInDir.callCount).toEqual(3);
+			expect(context.walkInDir.firstCall.args).toEqual([def,startpos,1,stops,steps,board]);
+			expect(context.walkInDir.secondCall.args).toEqual([def,startpos,2,stops,steps,board]);
+			expect(context.walkInDir.thirdCall.args).toEqual([def,startpos,3,stops,steps,board]);
+		});
+	});
+});
 
 
 
